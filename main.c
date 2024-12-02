@@ -90,41 +90,28 @@ DataEntry *find_character_data(char character, DataEntry *SingleStrokeData, int 
     }
     return NULL; // Character not found
 }
+// Function to convert stroke data to G-code commands
+void convert_to_gcode(DataEntry *charData, int stroke_count, float scaleFactor, float current_Xpos, float current_Ypos)
+{
+    for (int i = 0; i < stroke_count; i++)
+    {
+        float scaledX = (charData[i].Xposition * scaleFactor) + current_Xpos;
+        float scaledY = (charData[i].Yposition * scaleFactor) + current_Ypos;
 
+        if (charData[i].Zposition == 0)
+        {
+            printf("S0\n"); // Pen up
+            printf("G0 X%.2f Y%.2f\n", scaledX, scaledY);
+        }
+        else
+        {
+            printf("S1000\n"); // Pen down
+            printf("G1 X%.2f Y%.2f\n", scaledX, scaledY);
+        }
+    }
+}
 int main()
 {
-    // char mode[]= {'8','N','1',0};
-    char buffer[100];
-
-    // If we cannot open the port then give up immediately
-    if (CanRS232PortBeOpened() == -1)
-    {
-        printf("\nUnable to open the COM port (specified in serial.h) ");
-        exit(0);
-    }
-
-    // Time to wake up the robot
-    printf("\nAbout to wake up the robot\n");
-
-    // We do this by sending a new-line
-    sprintf(buffer, "\n");
-    // printf ("Buffer to send: %s", buffer); // For diagnostic purposes only, normally comment out
-    PrintBuffer(&buffer[0]);
-    Sleep(100);
-
-    // This is a special case - we wait  until we see a dollar ($)
-    WaitForDollar();
-
-    printf("\nThe robot is now ready to draw\n");
-
-    // These commands get the robot into 'ready to draw mode' and need to be sent before any writing commands
-    sprintf(buffer, "G1 X0 Y0 F1000\n");
-    SendCommands(buffer);
-    sprintf(buffer, "M3\n");
-    SendCommands(buffer);
-    sprintf(buffer, "S0\n");
-    SendCommands(buffer);
-
     // Open the font data file
     FILE *file = fopen("SingleStrokeFont.txt", "r");
     if (file == NULL)
@@ -190,18 +177,7 @@ int main()
                 printf("Character: %c\n", word[i]);
                 printf("Current X-position: %.2f\n", current_Xpos);
                 printf("Current Y-position: %.2f\n", current_Ypos);
-                printf("Stroke data (X, Y, Z):\n");
-
-                for (int j = 0; j < stroke_count; j++)
-                {
-                    // Apply scaling factor to stroke data and offset by current X and Y positions
-                    float scaledX = (charData[j].Xposition * scaleFactor) + current_Xpos;
-                    float scaledY = (charData[j].Yposition * scaleFactor) + current_Ypos;
-                    float scaledZ = charData[j].Zposition * scaleFactor;
-
-                    // Print the scaled and translated stroke data
-                    printf("(%.2f, %.2f, %.2f)\n", scaledX, scaledY, scaledZ);
-                }
+                convert_to_gcode(charData, stroke_count, scaleFactor, current_Xpos, current_Ypos);
             }
             else
             {
@@ -219,6 +195,37 @@ int main()
     fclose(file2);
     printf("\nFile reading complete.\n");
     return 0;
+    // char mode[]= {'8','N','1',0};
+    char buffer[100];
+
+    // If we cannot open the port then give up immediately
+    if (CanRS232PortBeOpened() == -1)
+    {
+        printf("\nUnable to open the COM port (specified in serial.h) ");
+        exit(0);
+    }
+
+    // Time to wake up the robot
+    printf("\nAbout to wake up the robot\n");
+
+    // We do this by sending a new-line
+    sprintf(buffer, "\n");
+    // printf ("Buffer to send: %s", buffer); // For diagnostic purposes only, normally comment out
+    PrintBuffer(&buffer[0]);
+    Sleep(100);
+
+    // This is a special case - we wait  until we see a dollar ($)
+    WaitForDollar();
+
+    printf("\nThe robot is now ready to draw\n");
+
+    // These commands get the robot into 'ready to draw mode' and need to be sent before any writing commands
+    sprintf(buffer, "G1 X0 Y0 F1000\n");
+    SendCommands(buffer);
+    sprintf(buffer, "M3\n");
+    SendCommands(buffer);
+    sprintf(buffer, "S0\n");
+    SendCommands(buffer);
 
     // These are sample commands to draw out some information - these are the ones you will be generating.
     sprintf(buffer, "G0 X-13.41849 Y0.000\n");
