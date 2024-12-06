@@ -18,13 +18,13 @@ typedef struct
 {
     float Xposition;
     float Yposition;
-    float Zposition;
+    int Zposition;
 } DataEntry;
 
 float get_scale_factor()
 {
     float scale;
-    char cha;
+    int cha;
 
     do
     {
@@ -43,13 +43,13 @@ float get_scale_factor()
         }
     } while (scale <= 4 || scale >= 10);
 
-    return scale / 18.0;
+    return scale / 18;
 }
 // Function to calculate the width of a word
-float word_width(const char *word, double scaleFactor)
+float word_width(const char *word, float scaleFactor)
 {
-    int length = strlen(word);        // Calculate the length of the word
-    return length * 18 * scaleFactor; // Width calculation
+    int length = (int)strlen(word);             // Calculate the length of the word
+    return (float)length * 18.0F * scaleFactor; // Width calculation
 }
 // Function to check if the word fits in the remaining space on the line
 int space_remaining(double *remaining_space, double word_width)
@@ -57,12 +57,11 @@ int space_remaining(double *remaining_space, double word_width)
     if (*remaining_space >= word_width)
     {
         *remaining_space -= word_width; // Subtract word width from remaining space
-        printf("Space remaining: %.2f\n", *remaining_space);
+
         return 1; // Word fits
     }
     else
     {
-        printf("No space remaining for this word. Starting new line.\n");
         return 0; // Word doesn't fit
     }
 }
@@ -112,89 +111,6 @@ void convert_to_gcode(DataEntry *charData, int stroke_count, float scaleFactor, 
 }
 int main()
 {
-    // Open the font data file
-    FILE *file = fopen("SingleStrokeFont.txt", "r");
-    if (file == NULL)
-    {
-        printf("Error opening file.\n");
-        return 1;
-    }
-
-    // Load font data into an array of structs
-    DataEntry SingleStrokeData[LINE_COUNT];
-    for (int i = 0; i < LINE_COUNT; i++)
-    {
-        fscanf(file, "%f %f %f", &SingleStrokeData[i].Xposition, &SingleStrokeData[i].Yposition, &SingleStrokeData[i].Zposition);
-    }
-    fclose(file);
-
-    // Get scaling factor from the user
-    float scaleFactor = get_scale_factor();
-    printf("Scale factor: %f\n", scaleFactor);
-
-    // Prompt for and open the input text file
-    char filename[200];
-    printf("Enter the name of the text file: ");
-    scanf("%199s", filename);
-
-    FILE *file2 = open_file(filename);
-    if (file2 == NULL)
-    {
-        return 1;
-    }
-
-    double remaining_space = LINE_WIDTH;
-    float current_Xpos = 0;                     // Initialize X-position tracker
-    float current_Ypos = -5 - 18 * scaleFactor; // Initialize Y-position
-
-    // Read and process each word using fscanf
-    char word[100];
-    while (fscanf(file2, "%99s", word) != EOF)
-    {
-        printf("\nWord: %s\n", word);
-
-        // Calculate and check if the word fits in the remaining space
-        double wordWidth = word_width(word, scaleFactor);
-
-        if (!space_remaining(&remaining_space, wordWidth))
-        {
-            // Start a new line
-            remaining_space = LINE_WIDTH - wordWidth;
-            current_Xpos = 0;                      // Reset X-position
-            current_Ypos += -5 - 18 * scaleFactor; // Move down to the next line
-            printf("New line started. Remaining space: %.2f\n", remaining_space);
-            // Add G-code for moving to a new line here if needed
-        }
-
-        // Process each character in the word
-        for (int i = 0; word[i] != '\0'; i++)
-        {
-            int stroke_count;
-            DataEntry *charData = find_character_data(word[i], SingleStrokeData, &stroke_count);
-
-            if (charData != NULL)
-            {
-                printf("Character: %c\n", word[i]);
-                printf("Current X-position: %.2f\n", current_Xpos);
-                printf("Current Y-position: %.2f\n", current_Ypos);
-                convert_to_gcode(charData, stroke_count, scaleFactor, current_Xpos, current_Ypos);
-            }
-            else
-            {
-                printf("Character: %c - Stroke data not found.\n", word[i]);
-            }
-
-            current_Xpos += 18 * scaleFactor; // Increment X-position for the next character
-        }
-
-        // Add space after the word
-        current_Xpos += 18 * scaleFactor;    // Increment X-position by the space width
-        remaining_space -= 18 * scaleFactor; // Deduct space width from remaining line space
-    }
-
-    fclose(file2);
-    printf("\nFile reading complete.\n");
-    return 0;
     // char mode[]= {'8','N','1',0};
     char buffer[100];
 
@@ -226,6 +142,87 @@ int main()
     SendCommands(buffer);
     sprintf(buffer, "S0\n");
     SendCommands(buffer);
+
+    // Open the font data file
+    FILE *file = fopen("SingleStrokeFont.txt", "r");
+    if (file == NULL)
+    {
+        printf("Error opening file.\n");
+        return 1;
+    }
+
+    // Load font data into an array of structs
+    DataEntry SingleStrokeData[LINE_COUNT];
+    for (int i = 0; i < LINE_COUNT; i++)
+    {
+        fscanf(file, "%f %f %d", &SingleStrokeData[i].Xposition, &SingleStrokeData[i].Yposition, &SingleStrokeData[i].Zposition);
+    }
+    fclose(file);
+
+    // Get scaling factor from the user
+    float scaleFactor = get_scale_factor();
+    printf("Scale factor: %f\n", scaleFactor);
+
+    // Prompt for and open the input text file
+    char filename[200];
+    printf("Enter the name of the text file: ");
+    scanf("%199s", filename);
+
+    FILE *file2 = open_file(filename);
+    if (file2 == NULL)
+    {
+        return 1;
+    }
+
+    double remaining_space = LINE_WIDTH;
+    float current_Xpos = 0;                     // Initialize X-position tracker
+    float current_Ypos = -5 - 18 * scaleFactor; // Initialize Y-position
+
+    // Read and process each word using fscanf
+    char word[100];
+    while (fscanf(file2, "%99s", word) != EOF)
+    {
+
+        // Calculate and check if the word fits in the remaining space
+        double wordWidth = word_width(word, scaleFactor);
+
+        if (!space_remaining(&remaining_space, wordWidth))
+        {
+            // Start a new line
+            remaining_space = LINE_WIDTH - wordWidth;
+            current_Xpos = 0;                      // Reset X-position
+            current_Ypos += -5 - 18 * scaleFactor; // Move down to the next line
+
+            // Add G-code for moving to a new line here if needed
+        }
+
+        // Process each character in the word
+        for (int i = 0; word[i] != '\0'; i++)
+        {
+            int stroke_count;
+            DataEntry *charData = find_character_data(word[i], SingleStrokeData, &stroke_count);
+
+            if (charData != NULL)
+            {
+
+                convert_to_gcode(charData, stroke_count, scaleFactor, current_Xpos, current_Ypos);
+            }
+            else
+            {
+                printf("Character: %c - Stroke data not found.\n", word[i]);
+            }
+
+            current_Xpos += 18 * scaleFactor; // Increment X-position for the next character
+        }
+
+        // Add space after the word
+        current_Xpos += 18 * scaleFactor;    // Increment X-position by the space width
+        remaining_space -= 18 * scaleFactor; // Deduct space width from remaining line space
+    }
+
+    fclose(file2);
+
+    return 0;
 
     // These are sample commands to draw out some information - these are the ones you will be generating.
     sprintf(buffer, "G0 X-13.41849 Y0.000\n");
