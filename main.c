@@ -92,8 +92,8 @@ DataEntry *find_character_data(char character, DataEntry *SingleStrokeData, int 
 // Function to convert stroke data to G-code commands for a word
 void convert_word_to_gcode(const char *word, DataEntry *SingleStrokeData, float scaleFactor, float *current_Xpos, float current_Ypos)
 {
-    char buffer[1000] = ""; // Buffer to hold G-code commands for the entire word
-    char temp[100];         // Temporary buffer for individual commands
+    char buffer[4000] = ""; // Buffer to hold G-code commands for the entire word
+    char temp[200];         // Temporary buffer for individual commands
 
     // Process each character in the word
     for (int i = 0; word[i] != '\0'; i++)
