@@ -93,7 +93,6 @@ DataEntry *find_character_data(char character, DataEntry *SingleStrokeData, int 
 void convert_word_to_gcode(const char *word, DataEntry *SingleStrokeData, float scaleFactor, float *current_Xpos, float current_Ypos)
 {
     char buffer[4000] = ""; // Buffer to hold G-code commands for the entire word
-    char temp[200];         // Temporary buffer for individual commands
 
     // Process each character in the word
     for (int i = 0; word[i] != '\0'; i++)
@@ -110,14 +109,13 @@ void convert_word_to_gcode(const char *word, DataEntry *SingleStrokeData, float 
 
                 if (charData[j].Zposition == 0)
                 {
-                    sprintf(temp, "S0\nG0 X%.2f Y%.2f\n", scaledX, scaledY); // Pen up
+                    sprintf(buffer, "S0\nG0 X%.2f Y%.2f\n", scaledX, scaledY); // Pen up
                 }
                 else
                 {
-                    sprintf(temp, "S1000\nG1 X%.2f Y%.2f\n", scaledX, scaledY); // Pen down
+                    sprintf(buffer, "S1000\nG1 X%.2f Y%.2f\n", scaledX, scaledY); // Pen down
                 }
-
-                strcat(buffer, temp); // Append the command to the word buffer
+                SendCommands(buffer);
             }
         }
         else
@@ -127,9 +125,6 @@ void convert_word_to_gcode(const char *word, DataEntry *SingleStrokeData, float 
 
         *current_Xpos += 18 * scaleFactor; // Increment X-position for the next character
     }
-
-    // Send all the G-code for the word at once
-    SendCommands(buffer);
 }
 int main()
 {
@@ -227,6 +222,10 @@ int main()
         current_Xpos += 18 * scaleFactor;    // Increment X-position by the space width
         remaining_space -= 18 * scaleFactor; // Deduct space width from remaining line space
     }
+    // These commands get the robot into 'ready to draw mode' and need to be sent before any writing commands
+
+    sprintf(buffer, "G1 X0 Y0 \n");
+    SendCommands(buffer);
 }
 
 // Send the data to the robot - note in 'PC' mode you need to hit space twice
