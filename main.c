@@ -41,7 +41,7 @@ float get_scale_factor()
         { // Check if the number is out of range
             printf("Invalid input! Please enter a value between 4 and 10.\n");
         }
-    } while (scale <= 4 || scale >= 10);
+    } while (scale < 4 || scale > 10);
 
     return scale / 18;
 }
@@ -89,25 +89,47 @@ DataEntry *find_character_data(char character, DataEntry *SingleStrokeData, int 
     }
     return NULL; // Character not found
 }
-// Function to convert stroke data to G-code commands
-void convert_to_gcode(DataEntry *charData, int stroke_count, float scaleFactor, float current_Xpos, float current_Ypos)
+// Function to convert stroke data to G-code commands for a word
+void convert_word_to_gcode(const char *word, DataEntry *SingleStrokeData, float scaleFactor, float *current_Xpos, float current_Ypos)
 {
-    for (int i = 0; i < stroke_count; i++)
-    {
-        float scaledX = (charData[i].Xposition * scaleFactor) + current_Xpos;
-        float scaledY = (charData[i].Yposition * scaleFactor) + current_Ypos;
+    char buffer[1000] = ""; // Buffer to hold G-code commands for the entire word
+    char temp[100];         // Temporary buffer for individual commands
 
-        if (charData[i].Zposition == 0)
+    // Process each character in the word
+    for (int i = 0; word[i] != '\0'; i++)
+    {
+        int stroke_count;
+        DataEntry *charData = find_character_data(word[i], SingleStrokeData, &stroke_count);
+
+        if (charData != NULL)
         {
-            printf("S0\n"); // Pen up
-            printf("G0 X%.2f Y%.2f\n", scaledX, scaledY);
+            for (int j = 0; j < stroke_count; j++)
+            {
+                float scaledX = (charData[j].Xposition * scaleFactor) + *current_Xpos;
+                float scaledY = (charData[j].Yposition * scaleFactor) + current_Ypos;
+
+                if (charData[j].Zposition == 0)
+                {
+                    sprintf(temp, "S0\nG0 X%.2f Y%.2f\n", scaledX, scaledY); // Pen up
+                }
+                else
+                {
+                    sprintf(temp, "S1000\nG1 X%.2f Y%.2f\n", scaledX, scaledY); // Pen down
+                }
+
+                strcat(buffer, temp); // Append the command to the word buffer
+            }
         }
         else
         {
-            printf("S1000\n"); // Pen down
-            printf("G1 X%.2f Y%.2f\n", scaledX, scaledY);
+            printf("Character: %c - Stroke data not found.\n", word[i]);
         }
+
+        *current_Xpos += 18 * scaleFactor; // Increment X-position for the next character
     }
+
+    // Send all the G-code for the word at once
+    SendCommands(buffer);
 }
 int main()
 {
@@ -150,7 +172,6 @@ int main()
         printf("Error opening file.\n");
         return 1;
     }
-
     // Load font data into an array of structs
     DataEntry SingleStrokeData[LINE_COUNT];
     for (int i = 0; i < LINE_COUNT; i++)
@@ -182,79 +203,35 @@ int main()
     char word[100];
     while (fscanf(file2, "%99s", word) != EOF)
     {
-
-        // Calculate and check if the word fits in the remaining space
+        // Calculate the width of the current word
         double wordWidth = word_width(word, scaleFactor);
 
+        // Check if the word fits in the remaining space
         if (!space_remaining(&remaining_space, wordWidth))
         {
-            // Start a new line
-            remaining_space = LINE_WIDTH - wordWidth;
-            current_Xpos = 0;                      // Reset X-position
-            current_Ypos += -5 - 18 * scaleFactor; // Move down to the next line
+            // Move to a new line
+            current_Xpos = 0;                         // Reset X-position to the start of the line
+            current_Ypos += -5 - 18 * scaleFactor;    // Move down to the next line
+            remaining_space = LINE_WIDTH - wordWidth; // Reset remaining space for the new line
 
-            // Add G-code for moving to a new line here if needed
+            // Add G-code to move to the new line position
+            char moveToNewLine[100];
+            sprintf(moveToNewLine, "G0 X%.2f Y%.2f\n", current_Xpos, current_Ypos);
+            SendCommands(moveToNewLine);
         }
 
-        // Process each character in the word
-        for (int i = 0; word[i] != '\0'; i++)
-        {
-            int stroke_count;
-            DataEntry *charData = find_character_data(word[i], SingleStrokeData, &stroke_count);
-
-            if (charData != NULL)
-            {
-
-                convert_to_gcode(charData, stroke_count, scaleFactor, current_Xpos, current_Ypos);
-            }
-            else
-            {
-                printf("Character: %c - Stroke data not found.\n", word[i]);
-            }
-
-            current_Xpos += 18 * scaleFactor; // Increment X-position for the next character
-        }
+        // Generate G-code for the current word
+        convert_word_to_gcode(word, SingleStrokeData, scaleFactor, &current_Xpos, current_Ypos);
 
         // Add space after the word
         current_Xpos += 18 * scaleFactor;    // Increment X-position by the space width
         remaining_space -= 18 * scaleFactor; // Deduct space width from remaining line space
     }
-
-    fclose(file2);
-
-    return 0;
-
-    // These are sample commands to draw out some information - these are the ones you will be generating.
-    sprintf(buffer, "G0 X-13.41849 Y0.000\n");
-    SendCommands(buffer);
-    sprintf(buffer, "S1000\n");
-    SendCommands(buffer);
-    sprintf(buffer, "G1 X-13.41849 Y-4.28041\n");
-    SendCommands(buffer);
-    sprintf(buffer, "G1 X-13.41849 Y0.0000\n");
-    SendCommands(buffer);
-    sprintf(buffer, "G1 X-13.41089 Y4.28041\n");
-    SendCommands(buffer);
-    sprintf(buffer, "S0\n");
-    SendCommands(buffer);
-    sprintf(buffer, "G0 X-7.17524 Y0\n");
-    SendCommands(buffer);
-    sprintf(buffer, "S1000\n");
-    SendCommands(buffer);
-    sprintf(buffer, "G0 X0 Y0\n");
-    SendCommands(buffer);
-
-    // Before we exit the program we need to close the COM port
-    CloseRS232Port();
-    printf("Com port now closed\n");
-
-    return (0);
 }
 
 // Send the data to the robot - note in 'PC' mode you need to hit space twice
 // as the dummy 'WaitForReply' has a getch() within the function.
 void SendCommands(char *buffer)
-
 {
     // printf ("Buffer to send: %s", buffer); // For diagnostic purposes only, normally comment out
     PrintBuffer(&buffer[0]);
