@@ -48,7 +48,7 @@ float calculate_word_width(const char *word, float scaleFactor)
 }
 
 // Function to check if a word fits in the remaining line space
-int fits_in_line(float *remaining_space, float word_width)
+int fits_in_line(double *remaining_space, float word_width)
 {
     if (*remaining_space >= word_width)
     {
@@ -176,7 +176,7 @@ int main()
     char word[100];
     while (fscanf(inputFile, "%99s", word) != EOF)
     {
-        double wordWidth = calculate_word_width(word, scaleFactor);
+        float wordWidth = calculate_word_width(word, scaleFactor);
         if (!fits_in_line(&remaining_space, wordWidth))
         {
             reset_position(&current_Xpos, &current_Ypos, scaleFactor, &remaining_space); // New line
